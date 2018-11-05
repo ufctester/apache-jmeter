@@ -62,7 +62,8 @@ public final class RemoteJMeterEngineImpl extends java.rmi.server.UnicastRemoteO
     private Properties remotelySetProperties;
 
     private RemoteJMeterEngineImpl(int localPort, int rmiRegistryPort) throws RemoteException {
-        super(localPort, RmiUtils.createClientSocketFactory(), RmiUtils.createServerSocketFactory()); // Create this object using the specified port (0 means anonymous)
+        // Create this object using the specified port (0 means anonymous)
+        super(localPort, RmiUtils.createClientSocketFactory(), RmiUtils.createServerSocketFactory()); 
         this.rmiRegistryPort = rmiRegistryPort;
         System.out.println("Created remote object: "+this.getRef().remoteToString());
     }
@@ -123,10 +124,13 @@ public final class RemoteJMeterEngineImpl extends java.rmi.server.UnicastRemoteO
      *
      * @param testTree
      *            the feature to be added to the ThreadGroup attribute
+     * @param hostAndPort Host and Port
+     * @param jmxBase JMX base
+     * @param scriptName Name of script
      */
     @Override
-    public void rconfigure(HashTree testTree, String host, File jmxBase, String scriptName) throws RemoteException {
-        log.info("Creating JMeter engine on host {} base '{}'", host, jmxBase);
+    public void rconfigure(HashTree testTree, String hostAndPort, File jmxBase, String scriptName) throws RemoteException {
+        log.info("Creating JMeter engine on host {} base '{}'", hostAndPort, jmxBase);
         try {
             if (log.isInfoEnabled()) {
                 log.info("Remote client host: {}", getClientHost());
@@ -140,7 +144,8 @@ public final class RemoteJMeterEngineImpl extends java.rmi.server.UnicastRemoteO
                 throw new IllegalStateException("Engine is busy - please try later");
             }
             ownerThread = Thread.currentThread();
-            backingEngine = new StandardJMeterEngine(host);
+            JMeterUtils.setProperty(JMeterUtils.THREAD_GROUP_DISTRIBUTED_PREFIX_PROPERTY_NAME, hostAndPort);
+            backingEngine = new StandardJMeterEngine(hostAndPort);
             backingEngine.configure(testTree); // sets active = true
         }
         FileServer.getFileServer().setScriptName(scriptName);
@@ -185,13 +190,10 @@ public final class RemoteJMeterEngineImpl extends java.rmi.server.UnicastRemoteO
     public void rexit() throws RemoteException {
         log.info("Exiting");
         // Bug 59400 - allow rexit() to return
-        Thread et = new Thread() {
-            @Override
-            public void run() {
-                log.info("Stopping the backing engine");
-                backingEngine.exit();
-            }  
-        };
+        Thread et = new Thread(() -> {
+            log.info("Stopping the backing engine");
+            backingEngine.exit();
+        });
         et.setDaemon(false);
         // Tidy up any objects we created
         Registry reg = LocateRegistry.getRegistry(
@@ -229,7 +231,7 @@ public final class RemoteJMeterEngineImpl extends java.rmi.server.UnicastRemoteO
      * @throws IllegalStateException if the caller is not the owner.
      */
     private void checkOwner(String methodName) {
-        if (ownerThread != null && ownerThread != Thread.currentThread()){
+        if (ownerThread != null && ownerThread != Thread.currentThread()) {
             String msg = "The engine is not owned by this thread - cannot call "+methodName;
             log.warn(msg);
             throw new IllegalStateException(msg);

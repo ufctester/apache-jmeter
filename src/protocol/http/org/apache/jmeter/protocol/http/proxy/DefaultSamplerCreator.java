@@ -77,7 +77,8 @@ public class DefaultSamplerCreator extends AbstractSamplerCreator {
 
     /**
      * 
-     * @see org.apache.jmeter.protocol.http.proxy.SamplerCreator#createSampler(org.apache.jmeter.protocol.http.proxy.HttpRequestHdr, java.util.Map, java.util.Map)
+     * @see org.apache.jmeter.protocol.http.proxy.SamplerCreator#createSampler(org.apache.jmeter.protocol.http.proxy.HttpRequestHdr,
+     *      java.util.Map, java.util.Map)
      */
     @Override
     public HTTPSamplerBase createSampler(HttpRequestHdr request,
@@ -98,7 +99,9 @@ public class DefaultSamplerCreator extends AbstractSamplerCreator {
     }
 
     /**
-     * @see org.apache.jmeter.protocol.http.proxy.SamplerCreator#populateSampler(org.apache.jmeter.protocol.http.sampler.HTTPSamplerBase, org.apache.jmeter.protocol.http.proxy.HttpRequestHdr, java.util.Map, java.util.Map)
+     * @see org.apache.jmeter.protocol.http.proxy.SamplerCreator#populateSampler(org.apache.jmeter.protocol.http.sampler.HTTPSamplerBase,
+     *      org.apache.jmeter.protocol.http.proxy.HttpRequestHdr, java.util.Map,
+     *      java.util.Map)
      */
     @Override
     public final void populateSampler(HTTPSamplerBase sampler,
@@ -181,7 +184,7 @@ public class DefaultSamplerCreator extends AbstractSamplerCreator {
             if (urlConfig != null) {
                 urlConfig.parseArguments(postData);
                 // Tell the sampler to do a multipart post
-                sampler.setDoMultipartPost(true);
+                sampler.setDoMultipart(true);
                 // Remove the header for content-type and content-length, since
                 // those values will most likely be incorrect when the sampler
                 // performs the multipart request, because the boundary string

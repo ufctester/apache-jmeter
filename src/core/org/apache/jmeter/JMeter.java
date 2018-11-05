@@ -22,6 +22,7 @@ import java.awt.event.ActionEvent;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.Authenticator;
@@ -39,11 +40,18 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Properties;
 import java.util.StringTokenizer;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
+import javax.script.Bindings;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineFactory;
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptException;
 import javax.swing.JTree;
 import javax.swing.UIManager;
 import javax.swing.tree.TreePath;
@@ -52,7 +60,9 @@ import org.apache.commons.cli.avalon.CLArgsParser;
 import org.apache.commons.cli.avalon.CLOption;
 import org.apache.commons.cli.avalon.CLOptionDescriptor;
 import org.apache.commons.cli.avalon.CLUtil;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.control.ReplaceableController;
 import org.apache.jmeter.engine.ClientJMeterEngine;
 import org.apache.jmeter.engine.DistributedRunner;
@@ -107,6 +117,8 @@ import com.thoughtworks.xstream.converters.ConversionException;
  * Main JMeter class; processes options and starts the GUI, non-GUI or server as appropriate.
  */
 public class JMeter implements JMeterPlugin {
+    private static final String JSR223_INIT_FILE = "jsr223.init.file";
+
     private static final Logger log = LoggerFactory.getLogger(JMeter.class);
     
     public static final int UDP_PORT_DEFAULT = 4445; // needed for ShutdownClient
@@ -278,7 +290,7 @@ public class JMeter implements JMeterPlugin {
      private static final CLOptionDescriptor D_FORCE_DELETE_RESULT_FILE =
             new CLOptionDescriptor("forceDeleteResultFile",
                     CLOptionDescriptor.ARGUMENT_DISALLOWED, FORCE_DELETE_RESULT_FILE,
-                    "force delete existing results files before start the test");
+                    "force delete existing results files and web report folder if present before starting the test");
 
     private static final String[][] DEFAULT_ICONS = {
             { "org.apache.jmeter.control.gui.TestPlanGui",               "org/apache/jmeter/images/beaker.gif" },     //$NON-NLS-1$ $NON-NLS-2$
@@ -517,14 +529,14 @@ public class JMeter implements JMeterPlugin {
                 CLOption testReportOpt = parser.getArgumentById(REPORT_GENERATING_OPT);
                 if (testReportOpt != null) { // generate report from existing file
                     String reportFile = testReportOpt.getArgument();
-                    extractAndSetReportOutputFolder(parser);
+                    extractAndSetReportOutputFolder(parser, false);
                     ReportGenerator generator = new ReportGenerator(reportFile, null);
                     generator.generate();
                 } else if (parser.getArgumentById(NONGUI_OPT) == null) { // not non-GUI => GUI
                     startGui(testFile);
                     startOptionalServers();
                 } else { // NON-GUI must be true
-                    extractAndSetReportOutputFolder(parser);
+                    extractAndSetReportOutputFolder(parser, deleteResultFile);
                     
                     CLOption rem = parser.getArgumentById(REMOTE_OPT_PARAM);
                     if (rem == null) {
@@ -562,14 +574,14 @@ public class JMeter implements JMeterPlugin {
      * @param parser {@link CLArgsParser}
      * @throws IllegalArgumentException
      */
-    private void extractAndSetReportOutputFolder(CLArgsParser parser) {
+    private void extractAndSetReportOutputFolder(CLArgsParser parser, boolean deleteResultFile) {
         CLOption reportOutputFolderOpt = parser
                 .getArgumentById(REPORT_OUTPUT_FOLDER_OPT);
         if(reportOutputFolderOpt != null) {
             String reportOutputFolder = parser.getArgumentById(REPORT_OUTPUT_FOLDER_OPT).getArgument();
             File reportOutputFolderAsFile = new File(reportOutputFolder);
 
-            JOrphanUtils.canSafelyWriteToFolder(reportOutputFolderAsFile);
+            JOrphanUtils.canSafelyWriteToFolder(reportOutputFolderAsFile, deleteResultFile);
             final String reportOutputFolderAbsPath = reportOutputFolderAsFile.getAbsolutePath();
             log.info("Setting property '{}' to:'{}'", JMETER_REPORT_OUTPUT_DIR_PROPERTY, reportOutputFolderAbsPath);
             JMeterUtils.setProperty(JMETER_REPORT_OUTPUT_DIR_PROPERTY, reportOutputFolderAbsPath);
@@ -634,23 +646,7 @@ public class JMeter implements JMeterPlugin {
             t.run(); // NOSONAR we just evaluate some code here
         }
 
-        // Should we run a beanshell script on startup?
-        String bshinit = JMeterUtils.getProperty("beanshell.init.file");// $NON-NLS-1$
-        if (bshinit != null){
-            log.info("Run Beanshell on file: {}", bshinit);
-            try {
-                BeanShellInterpreter bsi = new BeanShellInterpreter();
-                bsi.source(bshinit);
-            } catch (ClassNotFoundException e) {
-                if (log.isWarnEnabled()) {
-                    log.warn("Could not start Beanshell: {}", e.getLocalizedMessage());
-                }
-            } catch (JMeterException e) {
-                if (log.isWarnEnabled()) {
-                    log.warn("Could not process Beanshell file: {}", e.getLocalizedMessage());
-                }
-            }
-        }
+        runInitScripts();
 
         int mirrorPort=JMeterUtils.getPropDefault("mirror.server.port", 0);// $NON-NLS-1$
         if (mirrorPort > 0){
@@ -664,6 +660,67 @@ public class JMeter implements JMeterPlugin {
                 log.warn("Could not start Mirror server",e);
             }
         }
+    }
+
+
+    /**
+     * Runs user configured init scripts
+     */
+    void runInitScripts() {
+        // Should we run a beanshell script on startup?
+        String bshinit = JMeterUtils.getProperty("beanshell.init.file");// $NON-NLS-1$
+        if (bshinit != null){
+            log.info("Running Beanshell on file: {}", bshinit);
+            try {
+                BeanShellInterpreter bsi = new BeanShellInterpreter();
+                bsi.source(bshinit);
+            } catch (ClassNotFoundException|JMeterException e) {
+                if (log.isWarnEnabled()) {
+                    log.warn("Could not process Beanshell file: {}", e.getMessage());
+                }
+            }
+        }
+        
+        // Should we run a JSR223 script on startup?
+        String jsr223Init = JMeterUtils.getProperty(JSR223_INIT_FILE);// $NON-NLS-1$
+        if (jsr223Init != null){
+            log.info("Running JSR-223 init script in file: {}", jsr223Init);
+            File file = new File(jsr223Init);
+            if(file.exists() && file.canRead()) {
+                String extension = StringUtils.defaultIfBlank(FilenameUtils.getExtension(jsr223Init), "Groovy");
+                try (FileReader reader = new FileReader(file)) {
+                    ScriptEngineManager scriptEngineManager = new ScriptEngineManager();
+                    ScriptEngine engine = scriptEngineManager.getEngineByExtension(extension);
+                    if (engine == null) {
+                        log.warn(
+                                "No script engine found for [{}]. Will try to use Groovy. Possible engines and their extensions are: {}",
+                                extension, getEnginesAndExtensions(scriptEngineManager));
+                        extension = "Groovy";
+                        engine = scriptEngineManager.getEngineByName(extension);
+                    }
+                    Bindings bindings = engine.createBindings();
+                    final Logger logger = LoggerFactory.getLogger(JSR223_INIT_FILE);
+                    bindings.put("log", logger); // $NON-NLS-1$ (this name is fixed)
+                    Properties props = JMeterUtils.getJMeterProperties();
+                    bindings.put("props", props); // $NON-NLS-1$ (this name is fixed)
+                    // For use in debugging:
+                    bindings.put("OUT", System.out); // NOSONAR $NON-NLS-1$ (this name is fixed)
+                    engine.eval(reader, bindings);
+                } catch (IOException | ScriptException ex) {
+                    log.error("Error running init script {} with engine for {}: {}", jsr223Init, extension, ex);
+                }
+            } else {
+                log.error("Script {} referenced by property {} is not readable or does not exist", file.getAbsolutePath(), JSR223_INIT_FILE);
+            }
+        }
+    }
+
+
+    private Map<String, List<String>> getEnginesAndExtensions(ScriptEngineManager scriptEngineManager) {
+        return scriptEngineManager.getEngineFactories().stream()
+                .collect(Collectors.toMap(
+                        f -> f.getLanguageName() + " (" + f.getLanguageVersion() + ")",
+                        ScriptEngineFactory::getExtensions));
     }
 
     /**
@@ -772,6 +829,7 @@ public class JMeter implements JMeterPlugin {
                 throw new IllegalArgumentException("Unknown arg: " + option.getArgument());
 
             case PROPFILE2_OPT: // Bug 33920 - allow multiple props
+                log.info("Loading additional properties from: {}", name);
                 try (FileInputStream fis = new FileInputStream(new File(name))){
                     Properties tmp = new Properties();
                     tmp.load(fis);

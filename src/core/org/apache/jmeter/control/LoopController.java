@@ -20,28 +20,28 @@ package org.apache.jmeter.control;
 
 import java.io.Serializable;
 
+import org.apache.jmeter.engine.event.LoopIterationEvent;
+import org.apache.jmeter.engine.event.LoopIterationListener;
 import org.apache.jmeter.samplers.Sampler;
 import org.apache.jmeter.testelement.property.BooleanProperty;
 import org.apache.jmeter.testelement.property.IntegerProperty;
 import org.apache.jmeter.testelement.property.JMeterProperty;
 import org.apache.jmeter.testelement.property.StringProperty;
-import org.apache.jmeter.threads.JMeterContextService;
-import org.apache.jmeter.threads.JMeterVariables;
-import org.apache.jmeter.util.JMeterUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class that implements the Loop Controller, ie iterate infinitely or a configured number of times
  */
-public class LoopController extends GenericController implements Serializable {
-    static final String INDEX_VAR_NAME_SUFFIX = "__idx";
+public class LoopController extends GenericController implements Serializable, IteratingController, LoopIterationListener {
     
     public static final int INFINITE_LOOP_COUNT = -1; // $NON-NLS-1$
     
     public static final String LOOPS = "LoopController.loops"; // $NON-NLS-1$
 
     private static final long serialVersionUID = 7833960784370272300L;
-
-    /*
+    private static final Logger LOGGER = LoggerFactory.getLogger(LoopController.class);
+    /**
      * In spite of the name, this is actually used to determine if the loop controller is repeatable.
      *
      * The value is only used in nextIsNull() when the loop end condition has been detected:
@@ -57,8 +57,13 @@ public class LoopController extends GenericController implements Serializable {
 
     private transient int loopCount = 0;
 
-    // Cache loop value, see Bug 54467
+    /**
+     * Cached loop value 
+     * see Bug 54467
+     */
     private transient Integer nbLoops;
+
+    private boolean breakLoop;
 
     public LoopController() {
         setContinueForeverPrivate(true);
@@ -123,25 +128,23 @@ public class LoopController extends GenericController implements Serializable {
                 if (!getContinueForever()) {
                     setDone(true);
                 }
+                resetBreakLoop();
                 return null;
             }
             return super.next();
         } finally {
-            JMeterVariables variables = JMeterContextService.getContext().getVariables();
-            if(variables != null) {
-                variables.putObject(
-                        JMeterUtils.formatJMeterExportedVariableName(getName()+INDEX_VAR_NAME_SUFFIX), loopCount);
-            }
+            updateIterationIndex(getName(), loopCount);
         }
     }
     
     private boolean endOfLoop() {
         final int loops = getLoops();
-        return (loops > INFINITE_LOOP_COUNT) && (loopCount >= loops);
+        return breakLoop || (loops > INFINITE_LOOP_COUNT) && (loopCount >= loops);
     }
 
     @Override
     protected void setDone(boolean done) {
+        resetBreakLoop();
         nbLoops = null;
         super.setDone(done);
     }
@@ -203,7 +206,32 @@ public class LoopController extends GenericController implements Serializable {
     /**
      * Start next iteration
      */
+    @Override
     public void startNextLoop() {
         reInitialize();
+    }
+
+    private void resetBreakLoop() {
+        if(breakLoop) {
+            breakLoop = false;
+        }
+    }
+
+    @Override
+    public void breakLoop() {
+        breakLoop = true;
+        setFirst(true);
+        resetCurrent();
+        resetLoopCount();
+        recoverRunningVersion();
+    }
+
+    @Override
+    public void iterationStart(LoopIterationEvent iterEvent) {
+        if(LOGGER.isInfoEnabled()) {
+            LOGGER.info("iterationStart called on {} with source {} and iteration {}", getName(), iterEvent.getSource(), iterEvent.getIteration());
+        }
+        reInitialize();
+        resetLoopCount();
     }
 }

@@ -20,7 +20,6 @@ package org.apache.jmeter.threads;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -76,7 +75,7 @@ public class ThreadGroup extends AbstractThreadGroup {
     private transient Thread threadStarter;
 
     // List of active threads
-    private final Map<JMeterThread, Thread> allThreads = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<JMeterThread, Thread> allThreads = new ConcurrentHashMap<>();
     
     private transient Object addThreadLock = new Object();
 
@@ -298,7 +297,9 @@ public class ThreadGroup extends AbstractThreadGroup {
         jmeterThread.setThreadNum(threadNumber);
         jmeterThread.setThreadGroup(this);
         jmeterThread.setInitialContext(context);
-        final String threadName = groupName + " " + groupNumber + "-" + (threadNumber + 1);
+        String distributedPrefix = 
+                JMeterUtils.getPropDefault(JMeterUtils.THREAD_GROUP_DISTRIBUTED_PREFIX_PROPERTY_NAME, "");
+        final String threadName = distributedPrefix + (distributedPrefix.isEmpty() ? "":"-") +groupName + " " + groupNumber + "-" + (threadNumber + 1);
         jmeterThread.setThreadName(threadName);
         jmeterThread.setEngine(engine);
         jmeterThread.setOnErrorStopTest(onErrorStopTest);
@@ -372,16 +373,7 @@ public class ThreadGroup extends AbstractThreadGroup {
         allThreads.remove(thread);
     }
 
-    /**
-     * For each thread, invoke:
-     * <ul> 
-     * <li>{@link JMeterThread#stop()} - set stop flag</li>
-     * <li>{@link JMeterThread#interrupt()} - interrupt sampler</li>
-     * <li>{@link Thread#interrupt()} - interrupt JVM thread</li>
-     * </ul> 
-     */
-    @Override
-    public void tellThreadsToStop() {
+    public void tellThreadsToStop(boolean now) {
         running = false;
         if (delayedStartup) {
             try {
@@ -391,11 +383,29 @@ public class ThreadGroup extends AbstractThreadGroup {
             }
         }
 
-        allThreads.forEach((key, value) -> stopThread(key, value, true));
+        allThreads.forEach((key, value) -> stopThread(key, value, now));
     }
 
+    /**
+     * This is an immediate stop interrupting:
+     * <ul>
+     *  <li>current running threads</li>
+     *  <li>current running samplers</li>
+     * </ul>
+     * For each thread, invoke:
+     * <ul> 
+     * <li>{@link JMeterThread#stop()} - set stop flag</li>
+     * <li>{@link JMeterThread#interrupt()} - interrupt sampler</li>
+     * <li>{@link Thread#interrupt()} - interrupt JVM thread</li>
+     * </ul> 
+     */
+    @Override
+    public void tellThreadsToStop() {
+        tellThreadsToStop(true);
+    }
 
     /**
+     * This is a clean shutdown.
      * For each thread, invoke:
      * <ul> 
      * <li>{@link JMeterThread#stop()} - set stop flag</li>
@@ -506,18 +516,6 @@ public class ThreadGroup extends AbstractThreadGroup {
     }
 
     /**
-     * Pause ms milliseconds
-     * @param ms long milliseconds
-     */
-    private void pause(long ms){
-        try {
-            TimeUnit.MILLISECONDS.sleep(ms);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    /**
      * Starts Threads using ramp up
      */
     class ThreadStarter implements Runnable {
@@ -535,7 +533,19 @@ public class ThreadGroup extends AbstractThreadGroup {
             // Store context from Root Thread to pass it to created threads
             this.context = JMeterContextService.getContext();
         }
-        
+
+        /**
+         * Pause ms milliseconds
+         * @param ms long milliseconds
+         */
+        private void pause(long ms){
+            try {
+                TimeUnit.MILLISECONDS.sleep(ms);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
         /**
          * Wait for delay with RAMPUP_GRANULARITY
          * @param delay delay in ms

@@ -56,22 +56,19 @@ public class HttpSSLProtocolSocketFactory
         }
     }
     
-    private final JsseSSLManager sslManager;
-
     private final int CPS; // Characters per second to emulate
 
-    public HttpSSLProtocolSocketFactory(JsseSSLManager sslManager) {
-        this(sslManager, 0);
+    public HttpSSLProtocolSocketFactory() {
+        this(0);
     }
 
-    public HttpSSLProtocolSocketFactory(JsseSSLManager sslManager, int cps) {
+    public HttpSSLProtocolSocketFactory(int cps) {
         super();
-        this.sslManager = sslManager;
         CPS=cps;
     }
 
 
-    private void setSocket(Socket socket){
+    private void configureSocket(Socket socket){
         if (!(socket instanceof SSLSocket)) {
             throw new IllegalArgumentException("Expected SSLSocket");
         }
@@ -112,7 +109,7 @@ public class HttpSSLProtocolSocketFactory
 
     private SSLSocketFactory getSSLSocketFactory() throws IOException {
         try {
-            SSLContext sslContext = this.sslManager.getContext();
+            SSLContext sslContext = ((JsseSSLManager)SSLManager.getInstance()).getContext();
             return sslContext.getSocketFactory();
         } catch (GeneralSecurityException ex) {
             throw new IOException("Rethrown as IOE", ex);
@@ -136,7 +133,7 @@ public class HttpSSLProtocolSocketFactory
     public Socket createSocket() throws IOException, UnknownHostException {
         SSLSocketFactory sslfac = getSSLSocketFactory();
         Socket sock = sslfac.createSocket();
-        setSocket(sock);
+        configureSocket(sock);
         return wrapSocket(sock);
     }
 
@@ -145,7 +142,7 @@ public class HttpSSLProtocolSocketFactory
     public Socket createSocket(InetAddress host, int port) throws IOException {
         SSLSocketFactory sslfac = getSSLSocketFactory();
         Socket sock=sslfac.createSocket(host,port);
-        setSocket(sock);
+        configureSocket(sock);
         return wrapSocket(sock);
     }
 
@@ -153,7 +150,7 @@ public class HttpSSLProtocolSocketFactory
     public Socket createSocket(InetAddress address, int port, InetAddress localAddress, int localPort) throws IOException {
         SSLSocketFactory sslfac = getSSLSocketFactory();
         Socket sock=sslfac.createSocket(address, port, localAddress, localPort);
-        setSocket(sock);
+        configureSocket(sock);
         return wrapSocket(sock);
     }
 
@@ -181,7 +178,7 @@ public class HttpSSLProtocolSocketFactory
     public Socket createSocket(Socket s, String host, int port, boolean autoClose) throws IOException {
         SSLSocketFactory sslfac = getSSLSocketFactory();
         Socket sock=sslfac.createSocket(s, host,port, autoClose);
-        setSocket(sock);
+        configureSocket(sock);
         return wrapSocket(sock);
     }
 
@@ -189,7 +186,7 @@ public class HttpSSLProtocolSocketFactory
     public Socket createSocket(String host, int port) throws IOException, UnknownHostException {
         SSLSocketFactory sslfac = getSSLSocketFactory();
         Socket sock=sslfac.createSocket(host,port);
-        setSocket(sock);
+        configureSocket(sock);
         return wrapSocket(sock);
     }
 
@@ -198,7 +195,7 @@ public class HttpSSLProtocolSocketFactory
             throws IOException, UnknownHostException {
         SSLSocketFactory sslfac = getSSLSocketFactory();
         Socket sock=sslfac.createSocket(host, port, inetAddress, localPort);
-        setSocket(sock);
+        configureSocket(sock);
         return wrapSocket(sock);
 
     }

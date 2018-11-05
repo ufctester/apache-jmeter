@@ -29,6 +29,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.Reader;
 import java.lang.reflect.InvocationTargetException;
 import java.net.InetAddress;
 import java.net.URL;
@@ -45,6 +46,7 @@ import java.util.Properties;
 import java.util.ResourceBundle;
 import java.util.Vector;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 
 import javax.swing.ImageIcon;
 import javax.swing.JOptionPane;
@@ -54,7 +56,6 @@ import javax.swing.UIDefaults;
 import javax.swing.UIManager;
 import javax.swing.plaf.FontUIResource;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.jmeter.gui.GuiPackage;
 import org.apache.jmeter.threads.JMeterContextService;
 import org.apache.jorphan.reflect.ClassFinder;
@@ -79,7 +80,10 @@ import com.thoughtworks.xstream.security.NoTypePermission;
  */
 public class JMeterUtils implements UnitTestManager {
     private static final Logger log = LoggerFactory.getLogger(JMeterUtils.class);
+
     private static final String JMETER_VARS_PREFIX = "__jm__";
+    public static final String THREAD_GROUP_DISTRIBUTED_PREFIX_PROPERTY_NAME = "__jm.D_TG";
+
     // Note: cannot use a static variable here, because that would be processed before the JMeter properties
     // have been defined (Bug 52783)
     private static class LazyPatternCacheHolder {
@@ -663,26 +667,20 @@ public class JMeterUtils implements UnitTestManager {
     }
 
     public static String getResourceFileAsText(String name) {
-        BufferedReader fileReader = null;
         try {
             String lineEnd = System.getProperty("line.separator"); // $NON-NLS-1$
             InputStream is = JMeterUtils.class.getClassLoader().getResourceAsStream(name);
             if(is != null) {
-                fileReader = new BufferedReader(new InputStreamReader(is));
-                StringBuilder text = new StringBuilder();
-                String line;
-                while ((line = fileReader.readLine()) != null) {
-                    text.append(line);
-                    text.append(lineEnd);
+                try (Reader in = new InputStreamReader(is);
+                        BufferedReader fileReader = new BufferedReader(in)) {
+                    return fileReader.lines()
+                            .collect(Collectors.joining(lineEnd, "", lineEnd));
                 }
-                return text.toString();
             } else {
                 return ""; // $NON-NLS-1$                
             }
         } catch (IOException e) {
             return ""; // $NON-NLS-1$
-        } finally {
-            IOUtils.closeQuietly(fileReader);
         }
     }
 
@@ -1001,7 +999,7 @@ public class JMeterUtils implements UnitTestManager {
      * Determine whether we are in 'expert' mode. Certain features may be hidden
      * from user's view unless in expert mode.
      *
-     * @return true iif we're in expert mode
+     * @return true if we're in expert mode
      */
     public static boolean isExpertMode() {
         return JMeterUtils.getPropDefault(EXPERT_MODE_PROPERTY, false);

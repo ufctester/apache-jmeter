@@ -32,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.jmeter.assertions.AssertionResult;
 import org.apache.jmeter.gui.Searchable;
+import org.apache.jmeter.threads.JMeterContext.TestLogicalAction;
 import org.apache.jmeter.util.JMeterUtils;
 import org.apache.jorphan.util.JOrphanUtils;
 import org.slf4j.Logger;
@@ -228,9 +229,9 @@ public class SampleResult implements Serializable, Cloneable, Searchable {
     /** time to end connecting */
     private long connectTime = 0;
 
-    /** Should thread start next iteration ? */
-    private boolean startNextThreadLoop = false;
-
+    /** Way to signal what to do on Test */
+    private TestLogicalAction testLogicalAction = TestLogicalAction.CONTINUE;
+    
     /** Should thread terminate? */
     private boolean stopThread = false;
 
@@ -266,6 +267,8 @@ public class SampleResult implements Serializable, Cloneable, Searchable {
     private URL location;
 
     private transient boolean ignore;
+    
+    private transient int subResultIndex;
 
     /**
      * Cache for responseData as string to avoid multiple computations
@@ -331,7 +334,7 @@ public class SampleResult implements Serializable, Cloneable, Searchable {
         stopTest = res.stopTest;
         stopTestNow = res.stopTestNow;
         stopThread = res.stopThread;
-        startNextThreadLoop = res.startNextThreadLoop;
+        testLogicalAction = res.testLogicalAction;
         subResults = res.subResults; 
         success = res.success;//OK
         threadName = res.threadName;//OK
@@ -611,6 +614,16 @@ public class SampleResult implements Serializable, Cloneable, Searchable {
      *            the {@link SampleResult} to be added
      */
     public void addSubResult(SampleResult subResult) {
+        addSubResult(subResult, true);
+    }
+    /**
+     * Add a subresult and adjust the parent byte count and end-time.
+     * 
+     * @param subResult
+     *            the {@link SampleResult} to be added
+     * @param renameSubResults boolean do we rename subResults based on position
+     */
+    public void addSubResult(SampleResult subResult, boolean renameSubResults) {
         if(subResult == null) {
             // see https://bz.apache.org/bugzilla/show_bug.cgi?id=54778
             return;
@@ -629,7 +642,7 @@ public class SampleResult implements Serializable, Cloneable, Searchable {
         setSentBytes(getSentBytes() + subResult.getSentBytes());
         setHeadersSize(getHeadersSize() + subResult.getHeadersSize());
         setBodySize(getBodySizeAsLong() + subResult.getBodySizeAsLong());
-        addRawSubResult(subResult);
+        addRawSubResult(subResult, renameSubResults);
     }
     
     /**
@@ -639,7 +652,17 @@ public class SampleResult implements Serializable, Cloneable, Searchable {
      *            the {@link SampleResult} to be added
      */
     public void addRawSubResult(SampleResult subResult){
-        storeSubResult(subResult);
+        storeSubResult(subResult, true);
+    }
+    
+    /**
+     * Add a subresult to the collection without updating any parent fields.
+     * 
+     * @param subResult
+     *            the {@link SampleResult} to be added
+     */
+    private void addRawSubResult(SampleResult subResult, boolean renameSubResults){
+        storeSubResult(subResult, renameSubResults);
     }
 
     /**
@@ -653,8 +676,26 @@ public class SampleResult implements Serializable, Cloneable, Searchable {
      *            the {@link SampleResult} to be added
      */
     public void storeSubResult(SampleResult subResult) {
+        storeSubResult(subResult, true);
+    }
+    
+    /**
+     * Add a subresult read from a results file.
+     * <p>
+     * As for {@link SampleResult#addSubResult(SampleResult)
+     * addSubResult(SampleResult)}, except that the fields don't need to be
+     * accumulated
+     *
+     * @param subResult
+     *            the {@link SampleResult} to be added
+     * @param renameSubResults boolean do we rename subResults based on position
+     */
+    private void storeSubResult(SampleResult subResult, boolean renameSubResults) {
         if (subResults == null) {
             subResults = new ArrayList<>();
+        }
+        if(renameSubResults) {
+            subResult.setSampleLabel(getSampleLabel()+"-"+subResultIndex++);
         }
         subResults.add(subResult);
         subResult.setParent(this);
@@ -1466,16 +1507,24 @@ public class SampleResult implements Serializable, Cloneable, Searchable {
 
     /**
      * @return the startNextThreadLoop
+     * @deprecated use {@link SampleResult#getTestLogicalAction()}
      */
+    @Deprecated
     public boolean isStartNextThreadLoop() {
-        return startNextThreadLoop;
+        return testLogicalAction == TestLogicalAction.START_NEXT_ITERATION_OF_THREAD;
     }
 
     /**
+     * @deprecated use SampleResult#setTestLogicalAction(TestLogicalAction)
      * @param startNextThreadLoop the startNextLoop to set
      */
+    @Deprecated
     public void setStartNextThreadLoop(boolean startNextThreadLoop) {
-        this.startNextThreadLoop = startNextThreadLoop;
+        if(startNextThreadLoop) {
+            testLogicalAction = TestLogicalAction.START_NEXT_ITERATION_OF_THREAD;
+        } else {
+            testLogicalAction = TestLogicalAction.CONTINUE;
+        }
     }
 
     /**
@@ -1516,5 +1565,38 @@ public class SampleResult implements Serializable, Cloneable, Searchable {
      */
     public void setIgnore() {
         this.ignore = true;
+    }
+
+    /**
+     * @return String first non null assertion failure message
+     */
+    public String getFirstAssertionFailureMessage() {
+        String message = null;
+        AssertionResult[] results = getAssertionResults();
+
+        if (results != null) {
+            // Find the first non-null message
+            for (AssertionResult result : results) {
+                message = result.getFailureMessage();
+                if (message != null) {
+                    break;
+                }
+            }
+        }
+        return message;
+    }
+
+    /**
+     * @return the testLogicalAction
+     */
+    public TestLogicalAction getTestLogicalAction() {
+        return testLogicalAction;
+    }
+
+    /**
+     * @param testLogicalAction the testLogicalAction to set
+     */
+    public void setTestLogicalAction(TestLogicalAction testLogicalAction) {
+        this.testLogicalAction = testLogicalAction;
     }
 }

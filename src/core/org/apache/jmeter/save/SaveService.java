@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.jmeter.reporters.ResultCollectorHelper;
 import org.apache.jmeter.samplers.SampleEvent;
 import org.apache.jmeter.samplers.SampleResult;
@@ -122,11 +123,11 @@ public class SaveService {
     private static final String XML_HEADER = "<?xml version=\"1.0\" encoding=\"<ph>\"?>"; // $NON-NLS-1$
 
     // Default file name
-    private static final String SAVESERVICE_PROPERTIES_FILE = "/bin/saveservice.properties"; // $NON-NLS-1$
+    private static final String SAVESERVICE_PROPERTIES_FILE = "saveservice.properties"; // $NON-NLS-1$
 
     // Property name used to define file name
     private static final String SAVESERVICE_PROPERTIES = "saveservice_properties"; // $NON-NLS-1$
-
+    
     // Define file format versions
     private static final String VERSION_2_2 = "2.2";  // $NON-NLS-1$
 
@@ -149,13 +150,13 @@ public class SaveService {
     
     // Must match _version property value in saveservice.properties
     // used to ensure saveservice.properties and SaveService are updated simultaneously
-    static final String PROPVERSION = "4.0";// Expected version $NON-NLS-1$
+    static final String PROPVERSION = "5.0";// Expected version $NON-NLS-1$
 
     // Internal information only
     private static String fileVersion = ""; // computed from saveservice.properties file// $NON-NLS-1$
     // Must match the sha1 checksum of the file saveservice.properties (without newline character),
     // used to ensure saveservice.properties and SaveService are updated simultaneously
-    static final String FILEVERSION = "8e85129da2151ee8b4ecefa08b22aecb77d156cd"; // Expected value $NON-NLS-1$
+    static final String FILEVERSION = "e922e4aa06ed9f253d68c13f445d5bfedaccd876"; // Expected value $NON-NLS-1$
 
     private static String fileEncoding = ""; // read from properties file// $NON-NLS-1$
 
@@ -181,11 +182,21 @@ public class SaveService {
         }
     }
 
+    private static File getSaveServiceFile() {
+        String saveServiceProps = JMeterUtils.getPropDefault(SAVESERVICE_PROPERTIES,SAVESERVICE_PROPERTIES_FILE); //$NON-NLS-1$
+        if (saveServiceProps.length() > 0){ //$NON-NLS-1$
+            return JMeterUtils.findFile(saveServiceProps);
+        }
+        throw new IllegalStateException("Could not find file configured in saveservice_properties property set to:"+saveServiceProps);
+    }
+    
     public static Properties loadProperties() throws IOException{
         Properties nameMap = new Properties();
-        try (FileInputStream fis = new FileInputStream(JMeterUtils.getJMeterHome()
-                + JMeterUtils.getPropDefault(SAVESERVICE_PROPERTIES, SAVESERVICE_PROPERTIES_FILE))){
-            nameMap.load(fis);
+        File saveServiceFile = getSaveServiceFile();
+        if (saveServiceFile.canRead()){
+            try (FileInputStream fis = new FileInputStream(saveServiceFile)){
+                nameMap.load(fis);
+            }
         }
         return nameMap;
     }
@@ -193,10 +204,9 @@ public class SaveService {
     private static String getChecksumForPropertiesFile()
             throws NoSuchAlgorithmException, IOException {
         MessageDigest md = MessageDigest.getInstance("SHA1");
+        File saveServiceFile = getSaveServiceFile();
         try (BufferedReader reader = 
-                Files.newBufferedReader(new File(JMeterUtils.getJMeterHome()
-                    + JMeterUtils.getPropDefault(SAVESERVICE_PROPERTIES,
-                    SAVESERVICE_PROPERTIES_FILE)).toPath(), Charset.defaultCharset())) {
+                Files.newBufferedReader(saveServiceFile.toPath(), Charset.defaultCharset())) {
             String line = null;
             while ((line = reader.readLine()) != null) {
                 md.update(line.getBytes());
@@ -446,17 +456,13 @@ public class SaveService {
                 return null;
             }
             return wrapper.testPlan;
-        } catch (CannotResolveClassException e) {
+        } catch (CannotResolveClassException | ConversionException | NoClassDefFoundError e) {
             if(file != null) {
-                throw new IllegalArgumentException("Problem loading XML from:'"+file.getAbsolutePath()+"', cannot determine class for element: " + e, e);
+                throw new IllegalArgumentException("Problem loading XML from:'"+file.getAbsolutePath()+"'. \nCause:\n"+
+                        ExceptionUtils.getRootCauseMessage(e) +"\n\n Detail:"+e, e);
             } else {
-                throw new IllegalArgumentException("Problem loading XML, cannot determine class for element: " + e, e);
-            }
-        } catch (ConversionException | NoClassDefFoundError e) {
-            if(file != null) {
-                throw new IllegalArgumentException("Problem loading XML from:'"+file.getAbsolutePath()+"', missing class "+e , e);
-            } else {
-                throw new IllegalArgumentException("Problem loading XML, missing class "+e , e);
+                throw new IllegalArgumentException("Problem loading XML. \nCause:\n"+
+                        ExceptionUtils.getRootCauseMessage(e) +"\n\n Detail:"+e, e);
             }
         }
 

@@ -18,9 +18,8 @@
 *.properties text eol=lf
 *.py text eol=lf
 *.jacl text eol=lf
-*.options text eol=lf
-*.env text eol=lf
 .bashrc text eol=lf
+.jmx text eol=lf
 *.service text eol=lf
 *.c text
 *.h text
@@ -31,4 +30,3 @@
 *.jar binary
 *.exe binary
 *.zip binary
-
