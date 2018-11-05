@@ -28,15 +28,14 @@ import org.apache.jmeter.protocol.http.sampler.HTTPSampleResult;
 import org.apache.jmeter.samplers.SampleSaveConfiguration;
 import org.apache.jmeter.save.converters.SampleResultConverter;
 
-import com.thoughtworks.xstream.mapper.Mapper;
 import com.thoughtworks.xstream.converters.MarshallingContext;
 import com.thoughtworks.xstream.converters.UnmarshallingContext;
 import com.thoughtworks.xstream.io.HierarchicalStreamReader;
 import com.thoughtworks.xstream.io.HierarchicalStreamWriter;
+import com.thoughtworks.xstream.mapper.Mapper;
 
 /**
  * Class for XStream conversion of HTTPResult
- *
  */
 public class HTTPResultConverter extends SampleResultConverter {
 
@@ -47,7 +46,7 @@ public class HTTPResultConverter extends SampleResultConverter {
      * @return the version of this component
      */
     public static String getVersion() {
-        return "$Revision: 1649775 $";  //$NON-NLS-1$
+        return "$Revision: 1817321 $";  //$NON-NLS-1$
     }
 
     /**

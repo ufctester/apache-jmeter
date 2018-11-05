@@ -20,12 +20,12 @@ package org.apache.jmeter.save.converters;
 
 import org.apache.jorphan.collections.HashTree;
 
-import com.thoughtworks.xstream.mapper.Mapper;
 import com.thoughtworks.xstream.converters.MarshallingContext;
 import com.thoughtworks.xstream.converters.UnmarshallingContext;
 import com.thoughtworks.xstream.converters.collections.AbstractCollectionConverter;
 import com.thoughtworks.xstream.io.HierarchicalStreamReader;
 import com.thoughtworks.xstream.io.HierarchicalStreamWriter;
+import com.thoughtworks.xstream.mapper.Mapper;
 
 public class HashTreeConverter extends AbstractCollectionConverter {
 
@@ -36,7 +36,7 @@ public class HashTreeConverter extends AbstractCollectionConverter {
      * @return the version of this converter
      */
     public static String getVersion() {
-        return "$Revision: 1647347 $";  //$NON-NLS-1$
+        return "$Revision: 1817321 $";  //$NON-NLS-1$
     }
 
     /** {@inheritDoc} */

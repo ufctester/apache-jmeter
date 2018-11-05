@@ -38,11 +38,14 @@ import javax.swing.JRootPane;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.jmeter.config.Argument;
 import org.apache.jmeter.config.Arguments;
 import org.apache.jmeter.config.gui.ArgumentsPanel;
+import org.apache.jmeter.engine.ClientJMeterEngine;
 import org.apache.jmeter.engine.util.CompoundVariable;
 import org.apache.jmeter.functions.Function;
+import org.apache.jmeter.gui.action.ActionNames;
 import org.apache.jmeter.gui.action.ActionRouter;
 import org.apache.jmeter.gui.action.Help;
 import org.apache.jmeter.gui.action.KeyStrokes;
@@ -54,11 +57,16 @@ import org.apache.jmeter.util.JMeterUtils;
 import org.apache.jmeter.util.LocaleChangeEvent;
 import org.apache.jmeter.util.LocaleChangeListener;
 import org.apache.jorphan.gui.ComponentUtil;
+import org.apache.jorphan.gui.GuiUtils;
 import org.apache.jorphan.gui.JLabeledChoice;
 import org.apache.jorphan.gui.JLabeledTextField;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class FunctionHelper extends JDialog implements ActionListener, ChangeListener, LocaleChangeListener {
     private static final long serialVersionUID = 240L;
+
+    private static final Logger log = LoggerFactory.getLogger(ClientJMeterEngine.class);
 
     private JLabeledChoice functionList;
 
@@ -96,7 +104,7 @@ public class FunctionHelper extends JDialog implements ActionListener, ChangeLis
     }
 
     private void init() { // WARNING: called from ctor so must not be overridden (i.e. must be private or final)
-        parameterPanel = new ArgumentsPanel(JMeterUtils.getResString("function_params"), false); //$NON-NLS-1$
+        parameterPanel = new ArgumentsPanel(true,JMeterUtils.getResString("function_params")); //$NON-NLS-1$
         initializeFunctionList();
         this.getContentPane().setLayout(new BorderLayout(10, 10));
         JPanel comboPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
@@ -109,12 +117,12 @@ public class FunctionHelper extends JDialog implements ActionListener, ChangeLis
         JPanel resultsPanel = new VerticalPanel();
         JPanel generatePanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
         JPanel displayPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        cutPasteFunction = new JLabeledTextField(JMeterUtils.getResString("cut_paste_function"), 35); //$NON-NLS-1$
+        cutPasteFunction = new JLabeledTextField(JMeterUtils.getResString("cut_paste_function"), 35, null, false); //$NON-NLS-1$
         generatePanel.add(cutPasteFunction);
         JButton generateButton = new JButton(JMeterUtils.getResString("generate")); //$NON-NLS-1$
         generateButton.addActionListener(this);
         generatePanel.add(generateButton);
-        resultTextArea = JSyntaxTextArea.getInstance(5,50);
+        resultTextArea = JSyntaxTextArea.getInstance(5,60);
         resultTextArea.setToolTipText(JMeterUtils.getResString("function_helper_dialog_result_warn"));
         displayPanel.add(new JLabel(JMeterUtils.getResString("result_function")));
         displayPanel.add(JTextScrollPane.getInstance(resultTextArea));
@@ -129,7 +137,7 @@ public class FunctionHelper extends JDialog implements ActionListener, ChangeLis
 
     private void initializeFunctionList() {
         String[] functionNames = CompoundVariable.getFunctionNames();
-        Arrays.sort(functionNames, (o1, o2) -> o1.compareToIgnoreCase(o2));
+        Arrays.sort(functionNames, String::compareToIgnoreCase);
         functionList = new JLabeledChoice(JMeterUtils.getResString("choose_function"), functionNames); //$NON-NLS-1$
         functionList.addChangeListener(this);
     }
@@ -137,14 +145,7 @@ public class FunctionHelper extends JDialog implements ActionListener, ChangeLis
     @Override
     public void stateChanged(ChangeEvent event) {
         try {
-            Arguments args = new Arguments();
-            Function function = CompoundVariable.getFunctionClass(functionList.getText()).newInstance();
-            List<String> argumentDesc = function.getArgumentDesc();
-            for (String help : argumentDesc) {
-                args.addArgument(help, ""); //$NON-NLS-1$
-            }
-            parameterPanel.configure(args);
-            parameterPanel.revalidate();
+            initParameterPanel();
             getContentPane().remove(parameterPanel);
             this.pack();
             getContentPane().add(parameterPanel, BorderLayout.CENTER);
@@ -152,8 +153,24 @@ public class FunctionHelper extends JDialog implements ActionListener, ChangeLis
             this.validate();
             resultTextArea.setText("");
             this.repaint();
-        } catch (InstantiationException | IllegalAccessException e) {
+        } catch (InstantiationException | IllegalAccessException ex) {
+            log.info("Exception during stateChanged", ex);
         }
+    }
+
+    /**
+     * @throws InstantiationException if function instantiation fails
+     * @throws IllegalAccessException if function instantiation fails
+     */
+    protected void initParameterPanel() throws InstantiationException, IllegalAccessException {
+        Arguments args = new Arguments();
+        Function function = CompoundVariable.getFunctionClass(functionList.getText()).newInstance();
+        List<String> argumentDesc = function.getArgumentDesc();
+        for (String help : argumentDesc) {
+            args.addArgument(help, ""); //$NON-NLS-1$
+        }
+        parameterPanel.configure(args);
+        parameterPanel.revalidate();
     }
 
     @Override
@@ -177,16 +194,25 @@ public class FunctionHelper extends JDialog implements ActionListener, ChangeLis
         }
         functionCall.append("}");
         cutPasteFunction.setText(functionCall.toString());
+        GuiUtils.copyTextToClipboard(cutPasteFunction.getText());
         CompoundVariable function = new CompoundVariable(functionCall.toString());
-        resultTextArea.setText(function.execute().trim()); 
+        try {
+            resultTextArea.setText(function.execute().trim());
+        } catch(Exception ex) {
+            log.error("Error calling function {}", functionCall.toString(), ex);
+            resultTextArea.setText(ex.getMessage() + ", \nstacktrace:\n "+
+                    ExceptionUtils.getStackTrace(ex));
+            resultTextArea.setCaretPosition(0);
+        }
     }
 
     private class HelpListener implements ActionListener {
         @Override
         public void actionPerformed(ActionEvent e) {
             String[] source = new String[] { Help.HELP_FUNCTIONS, functionList.getText() };
-            ActionEvent helpEvent = new ActionEvent(source, e.getID(), "help"); //$NON-NLS-1$
-            ActionRouter.getInstance().actionPerformed(helpEvent);
+            ActionRouter.getInstance().doActionNow(
+                    new ActionEvent(source, e.getID(), ActionNames.HELP));
+
         }
     }
 
@@ -195,5 +221,17 @@ public class FunctionHelper extends JDialog implements ActionListener, ChangeLis
         setTitle(JMeterUtils.getResString("function_helper_title")); //$NON-NLS-1$
         this.getContentPane().removeAll(); // so we can add them again in init
         init();
+    }
+    
+    @Override
+    public void setVisible(boolean visible) {
+        super.setVisible(visible);
+        if (visible) {
+            try {
+                initParameterPanel();
+            } catch (InstantiationException | IllegalAccessException ex) {
+                log.error("Error initializing parameter panel", ex);
+            }
+        }
     }
 }

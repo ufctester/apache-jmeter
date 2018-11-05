@@ -19,7 +19,7 @@
 [
 <!ENTITY sect-num '11'>
 ]>
-<document prev="build-jms-point-to-point-test-plan.html" next="listeners.html" id="$Id: build-jms-topic-test-plan.xml 1792313 2017-04-22 18:21:22Z milamber $">
+<document prev="build-jms-point-to-point-test-plan.html" next="listeners.html" id="$Id: build-jms-topic-test-plan.xml 1809029 2017-09-20 13:13:37Z pmouawad $">
 
 <properties>
   <title>User's Manual: Building a JMS (Java Messaging Service) Test Plan</title>
@@ -155,7 +155,7 @@ to the Publisher element
 (<menuchoice>
   <guimenuitem>Add</guimenuitem>
   <guimenuitem>Sampler</guimenuitem>
-  <guimenuitem>JMS Subscriber</guimenuitem>
+  <guimenuitem>JMS Publisher</guimenuitem>
 </menuchoice>).
 Then, select the JMS Publisher element in the tree and edit the following properties:
 </p>

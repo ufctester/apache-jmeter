@@ -202,9 +202,7 @@ public class GenericTestBeanCustomizer extends JPanel implements SharedCustomize
     }
     /**
      * Create a customizer for a given test bean type.
-     *
-     * @param testBeanClass
-     *            a subclass of TestBean
+     * @param beanInfo {@link BeanInfo}
      * @see org.apache.jmeter.testbeans.TestBean
      */
     GenericTestBeanCustomizer(BeanInfo beanInfo) {
@@ -538,24 +536,6 @@ public class GenericTestBeanCustomizer extends JPanel implements SharedCustomize
         }
     }
 
-//  /**
-//   * Find the index of the property of the given name.
-//   *
-//   * @param name
-//   *            the name of the property
-//   * @return the index of that property in the descriptors array, or -1 if
-//   *         there's no property of this name.
-//   */
-//  private int descriptorIndex(String name) // NOTUSED
-//  {
-//      for (int i = 0; i < descriptors.length; i++) {
-//          if (descriptors[i].getName().equals(name)) {
-//              return i;
-//          }
-//      }
-//      return -1;
-//  }
-
     /**
      * Initialize the GUI.
      */
@@ -705,7 +685,8 @@ public class GenericTestBeanCustomizer extends JPanel implements SharedCustomize
         public int compare(PropertyDescriptor d1, PropertyDescriptor d2) {
             String g1 = group(d1);
             String g2 = group(d2);
-            Integer go1 = groupOrder(g1), go2 = groupOrder(g2);
+            Integer go1 = groupOrder(g1);
+            Integer go2 = groupOrder(g2);
 
             int result = go1.compareTo(go2);
             if (result != 0) {

@@ -25,6 +25,7 @@ import javax.swing.JLabel;
 import javax.swing.JRadioButton;
 import javax.swing.JTextField;
 
+import org.apache.jmeter.gui.GUIMenuSortOrder;
 import org.apache.jmeter.gui.util.HorizontalPanel;
 import org.apache.jmeter.sampler.TestAction;
 import org.apache.jmeter.samplers.gui.AbstractSamplerGui;
@@ -32,6 +33,7 @@ import org.apache.jmeter.testelement.TestElement;
 import org.apache.jmeter.util.JMeterUtils;
 import org.apache.jorphan.gui.layout.VerticalLayout;
 
+@GUIMenuSortOrder(1)
 public class TestActionGui extends AbstractSamplerGui {
     private static final long serialVersionUID = 240L;
 
@@ -179,7 +181,7 @@ public class TestActionGui extends AbstractSamplerGui {
             if (pauseButton.isSelected()) {
                 action = TestAction.PAUSE;
                 durationField.setEnabled(true);
-                targetBox.setEnabled(true);
+                targetBox.setEnabled(false);
             }
         });
         stopButton = new JRadioButton(stopAction, false);

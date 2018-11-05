@@ -20,11 +20,14 @@ package org.apache.jmeter.control;
 
 import java.io.Serializable;
 
+import org.apache.jmeter.gui.GUIMenuSortOrder;
 import org.apache.jmeter.samplers.Sampler;
 import org.apache.jmeter.testelement.property.BooleanProperty;
 import org.apache.jmeter.testelement.property.StringProperty;
 import org.apache.jmeter.threads.JMeterContext;
+import org.apache.jmeter.threads.JMeterContextService;
 import org.apache.jmeter.threads.JMeterVariables;
+import org.apache.jmeter.util.JMeterUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,7 +38,9 @@ import org.slf4j.LoggerFactory;
  * Iteration can take the full list or only a subset (configured through indexes)
  *
  */
+@GUIMenuSortOrder(5)
 public class ForeachController extends GenericController implements Serializable {
+
     private static final Logger log = LoggerFactory.getLogger(ForeachController.class);
 
     private static final long serialVersionUID = 241L;
@@ -195,12 +200,21 @@ public class ForeachController extends GenericController implements Serializable
     // Prevent entry if nothing to do
     @Override
     public Sampler next() {
-        if (emptyList()) {
-            reInitialize();
-            resetLoopCount();
-            return null;
+        try {
+            if (emptyList()) {
+                reInitialize();
+                resetLoopCount();
+                return null;
+            }
+            return super.next();
+        } finally {
+            JMeterVariables variables = JMeterContextService.getContext().getVariables();
+            if(variables != null) {
+                variables.putObject(
+                    JMeterUtils.formatJMeterExportedVariableName(
+                            getName()+LoopController.INDEX_VAR_NAME_SUFFIX), loopCount);
+            }
         }
-        return super.next();
     }
 
     /**

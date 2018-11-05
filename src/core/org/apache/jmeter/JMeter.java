@@ -78,6 +78,7 @@ import org.apache.jmeter.report.dashboard.GenerationException;
 import org.apache.jmeter.report.dashboard.ReportGenerator;
 import org.apache.jmeter.reporters.ResultCollector;
 import org.apache.jmeter.reporters.Summariser;
+import org.apache.jmeter.rmi.RmiUtils;
 import org.apache.jmeter.samplers.Remoteable;
 import org.apache.jmeter.samplers.SampleEvent;
 import org.apache.jmeter.save.SaveService;
@@ -344,17 +345,19 @@ public class JMeter implements JMeterPlugin {
      */
     private void startGui(String testFile) {
         System.out.println("================================================================================");//NOSONAR
-        System.out.println("Don't use GUI mode for load testing, only for Test creation and Test debugging !");//NOSONAR
+        System.out.println("Don't use GUI mode for load testing !, only for Test creation and Test debugging.");//NOSONAR
         System.out.println("For load testing, use NON GUI Mode:");//NOSONAR
-        System.out.println("   jmeter -n -t [jmx file] -l [results file] -e -o [Path to output folder]");//NOSONAR
-        System.out.println("& adapt Java Heap to your test requirements:");//NOSONAR
-        System.out.println("   Modify HEAP=\"-Xms512m -Xmx512m\" in the JMeter batch file");//NOSONAR
+        System.out.println("   jmeter -n -t [jmx file] -l [results file] -e -o [Path to web report folder]");//NOSONAR
+        System.out.println("& increase Java Heap to meet your test requirements:");//NOSONAR
+        System.out.println("   Modify current env variable HEAP=\"-Xms1g -Xmx1g -XX:MaxMetaspaceSize=256m\" in the jmeter batch file");//NOSONAR
+        System.out.println("Check : https://jmeter.apache.org/usermanual/best-practices.html");//NOSONAR
         System.out.println("================================================================================");//NOSONAR
         
         SplashScreen splash = new SplashScreen();
         splash.showScreen();
         String jMeterLaf = LookAndFeelCommand.getJMeterLaf();
         try {
+            log.info("Setting LAF to: {}", jMeterLaf);
             UIManager.setLookAndFeel(jMeterLaf);
         } catch (Exception ex) {
             log.warn("Could not set LAF to: {}", jMeterLaf, ex);
@@ -375,7 +378,9 @@ public class JMeter implements JMeterPlugin {
         MainFrame main = new MainFrame(treeModel, treeLis);
         splash.setProgress(100);
         ComponentUtil.centerComponentInWindow(main, 80);
+        main.setLocationRelativeTo(splash);
         main.setVisible(true);
+        main.toFront();
         instance.actionPerformed(new ActionEvent(main, 1, ActionNames.ADD_ALL));
         if (testFile != null) {
             try {
@@ -493,7 +498,7 @@ public class JMeter implements JMeterPlugin {
             } else if (parser.getArgumentById(SERVER_OPT) != null) {
                 // Start the server
                 try {
-                    RemoteJMeterEngineImpl.startServer(JMeterUtils.getPropDefault("server_port", 0)); // $NON-NLS-1$
+                    RemoteJMeterEngineImpl.startServer(RmiUtils.getRmiRegistryPort()); // $NON-NLS-1$
                     startOptionalServers();
                 } catch (Exception ex) {
                     System.err.println("Server failed to start: "+ex);//NOSONAR
@@ -940,6 +945,26 @@ public class JMeter implements JMeterPlugin {
             // For GUI runs this is done in Start.java
             convertSubTree(tree);
             
+            Summariser summariser = null;
+            String summariserName = JMeterUtils.getPropDefault("summariser.name", "");//$NON-NLS-1$
+            if (summariserName.length() > 0) {
+                log.info("Creating summariser <{}>", summariserName);
+                println("Creating summariser <" + summariserName + ">");
+                summariser = new Summariser(summariserName);
+            }
+            ResultCollector resultCollector = null;
+            if (logFile != null) {
+                resultCollector = new ResultCollector(summariser);
+                resultCollector.setFilename(logFile);
+                tree.add(tree.getArray()[0], resultCollector);
+            }
+            else {
+                // only add Summariser if it can not be shared with the ResultCollector
+                if (summariser != null) {
+                    tree.add(tree.getArray()[0], summariser);
+                }
+            }
+
             if (deleteResultFile) {
                 SearchByClass<ResultCollector> resultListeners = new SearchByClass<>(ResultCollector.class);
                 tree.traverse(resultListeners);
@@ -947,34 +972,17 @@ public class JMeter implements JMeterPlugin {
                 while (irc.hasNext()) {
                     ResultCollector rc = irc.next();
                     File resultFile = new File(rc.getFilename());
-                    if (resultFile.exists()) {
-                        resultFile.delete();
+                    if (resultFile.exists() && !resultFile.delete()) {
+                        throw new IllegalStateException("Could not delete results file " + resultFile.getAbsolutePath()
+                            + "(canRead:"+resultFile.canRead()+", canWrite:"+resultFile.canWrite()+")");
                     }
                 }
             }
-
-            Summariser summer = null;
-            String summariserName = JMeterUtils.getPropDefault("summariser.name", "");//$NON-NLS-1$
-            if (summariserName.length() > 0) {
-                log.info("Creating summariser <{}>", summariserName);
-                println("Creating summariser <" + summariserName + ">");
-                summer = new Summariser(summariserName);
-            }
             ReportGenerator reportGenerator = null;
-            if (logFile != null) {
-                ResultCollector logger = new ResultCollector(summer);
-                logger.setFilename(logFile);
-                tree.add(tree.getArray()[0], logger);
-                if(generateReportDashboard) {
-                    reportGenerator = new ReportGenerator(logFile, logger);
-                }
+            if (logFile != null && generateReportDashboard) {
+                reportGenerator = new ReportGenerator(logFile, resultCollector);
             }
-            else {
-                // only add Summariser if it can not be shared with the ResultCollector
-                if (summer != null) {
-                    tree.add(tree.getArray()[0], summer);
-                }
-            }
+
             // Used for remote notification of threads start/stop,see BUG 54152
             // Summariser uses this feature to compute correctly number of threads 
             // when NON GUI mode is used

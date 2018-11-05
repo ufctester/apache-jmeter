@@ -1,0 +1,10 @@
+Setup JMeter Source Code
+
+SET ANT_HOME=C:\gitbash\opt\ant
+SET JAVA_HOME=C:\gitbash\opt\jdk\jdk1.8.0_171x64_sun
+
+1) Download apache-jmeter dependent jars (Optional)
+   %ANT_HOME%\bin\ant.bat download_jars
+
+2) Setup Eclipse Project (Also downloads dependencies)
+   %ANT_HOME%\bin\ant.bat -f build.xml setup-eclipse-project

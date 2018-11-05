@@ -20,7 +20,7 @@
    Eclipse seems to use TABS for indenting the entries.
  -->
 <projectDescription>
-    <name>apache-jmeter</name>
+    <name>jmeter</name>
     <comment></comment>
     <projects>
     </projects>

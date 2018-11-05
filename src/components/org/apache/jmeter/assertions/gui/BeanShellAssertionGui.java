@@ -28,19 +28,22 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 
 import org.apache.jmeter.assertions.BeanShellAssertion;
+import org.apache.jmeter.gui.GUIMenuSortOrder;
+import org.apache.jmeter.gui.util.FilePanelEntry;
 import org.apache.jmeter.gui.util.JSyntaxTextArea;
 import org.apache.jmeter.gui.util.JTextScrollPane;
 import org.apache.jmeter.testelement.TestElement;
 import org.apache.jmeter.testelement.property.BooleanProperty;
 import org.apache.jmeter.util.JMeterUtils;
 
+@GUIMenuSortOrder(Integer.MAX_VALUE)
 public class BeanShellAssertionGui extends AbstractAssertionGui {
 
     private static final long serialVersionUID = 240L;
 
     private JCheckBox resetInterpreter;// reset the bsh.Interpreter before each execution
 
-    private JTextField filename;// script file name (if present)
+    private final FilePanelEntry filename = new FilePanelEntry(JMeterUtils.getResString("bsh_script_file"),".bsh"); // script file name (if present)
 
     private JTextField parameters;// parameters to pass to script file (or script)
 
@@ -54,7 +57,7 @@ public class BeanShellAssertionGui extends AbstractAssertionGui {
     public void configure(TestElement element) {
         scriptField.setInitialText(element.getPropertyAsString(BeanShellAssertion.SCRIPT));
         scriptField.setCaretPosition(0);
-        filename.setText(element.getPropertyAsString(BeanShellAssertion.FILENAME));
+        filename.setFilename(element.getPropertyAsString(BeanShellAssertion.FILENAME));
         parameters.setText(element.getPropertyAsString(BeanShellAssertion.PARAMETERS));
         resetInterpreter.setSelected(element.getPropertyAsBoolean(BeanShellAssertion.RESET_INTERPRETER));
         super.configure(element);
@@ -77,7 +80,7 @@ public class BeanShellAssertionGui extends AbstractAssertionGui {
         te.clear();
         super.configureTestElement(te);
         te.setProperty(BeanShellAssertion.SCRIPT, scriptField.getText());
-        te.setProperty(BeanShellAssertion.FILENAME, filename.getText());
+        te.setProperty(BeanShellAssertion.FILENAME, filename.getFilename());
         te.setProperty(BeanShellAssertion.PARAMETERS, parameters.getText());
         te.setProperty(new BooleanProperty(BeanShellAssertion.RESET_INTERPRETER, resetInterpreter.isSelected()));
     }
@@ -87,17 +90,11 @@ public class BeanShellAssertionGui extends AbstractAssertionGui {
         return "bsh_assertion_title"; // $NON-NLS-1$
     }
 
-    private JPanel createFilenamePanel()// TODO ought to be a FileChooser ...
-    {
-        JLabel label = new JLabel(JMeterUtils.getResString("bsh_script_file")); //$NON-NLS-1$
+    private JPanel createFilenamePanel() {
 
-        filename = new JTextField(10);
-        filename.setName(BeanShellAssertion.FILENAME);
-        label.setLabelFor(filename);
-
-        JPanel filenamePanel = new JPanel(new BorderLayout(5, 0));
-        filenamePanel.add(label, BorderLayout.WEST);
+        JPanel filenamePanel = new JPanel(new BorderLayout());
         filenamePanel.add(filename, BorderLayout.CENTER);
+
         return filenamePanel;
     }
 
@@ -162,7 +159,7 @@ public class BeanShellAssertionGui extends AbstractAssertionGui {
     @Override
     public void clearGui() {
         super.clearGui();
-        filename.setText(""); // $NON-NLS-1$
+        filename.setFilename(""); // $NON-NLS-1$
         parameters.setText(""); // $NON-NLS-1$
         scriptField.setInitialText(""); // $NON-NLS-1$
         resetInterpreter.setSelected(false);

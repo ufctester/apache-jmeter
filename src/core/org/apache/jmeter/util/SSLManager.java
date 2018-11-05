@@ -60,7 +60,6 @@ public abstract class SSLManager {
     private static final String PKCS12 = "pkcs12"; // $NON-NLS-1$
 
     /** Singleton instance of the manager */
-    //@GuardedBy("this")
     private static SSLManager manager;
 
     private static final boolean IS_SSL_SUPPORTED = true;
@@ -228,7 +227,7 @@ public abstract class SSLManager {
                         log.info("Truststore loaded OK from file");
                     }
                 } else {
-                    log.info("Truststore file not found, loading empty truststore");
+                    log.warn("Truststore file not found, loading empty truststore");
                     this.trustStore.load(null, null);
                 }
             } catch (Exception e) {

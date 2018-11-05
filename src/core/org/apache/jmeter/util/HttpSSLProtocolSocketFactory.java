@@ -1,18 +1,18 @@
 /*
- *  Licensed to the Apache Software Foundation (ASF) under one or more
- *  contributor license agreements.  See the NOTICE file distributed with
- *  this work for additional information regarding copyright ownership.
- *  The ASF licenses this file to You under the Apache License, Version 2.0
- *  (the "License"); you may not use this file except in compliance with
- *  the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.jmeter.util;
@@ -35,7 +35,6 @@ import org.slf4j.LoggerFactory;
  *
  * Used by JsseSSLManager to set up the Java https socket handling
  */
-
 public class HttpSSLProtocolSocketFactory
     extends SSLSocketFactory {// for java sockets
 
@@ -46,12 +45,17 @@ public class HttpSSLProtocolSocketFactory
 
     private static final String[] protocols = PROTOCOL_LIST.split(" "); // $NON-NLS-1$
 
+    private static final String CIPHER_LIST =
+            JMeterUtils.getPropDefault("https.cipherSuites", ""); // $NON-NLS-1$ $NON-NLS-2$
+    
+    private static final String[] ciphers = CIPHER_LIST.split(", *"); // $NON-NLS-1$
+    
     static {
         if (!PROTOCOL_LIST.isEmpty()) {
-            log.info("Using protocol list: {}", PROTOCOL_LIST);
+            log.info("Using protocol list:{} and cipher list: {}", PROTOCOL_LIST, CIPHER_LIST);
         }
     }
-
+    
     private final JsseSSLManager sslManager;
 
     private final int CPS; // Characters per second to emulate
@@ -75,10 +79,21 @@ public class HttpSSLProtocolSocketFactory
         if (!PROTOCOL_LIST.isEmpty()) {
             try {
                 sock.setEnabledProtocols(protocols);
-            } catch (IllegalArgumentException e) {
+            } catch (IllegalArgumentException e) { // NOSONAR
                 if (log.isWarnEnabled()) {
                     log.warn("Could not set protocol list: {}.", PROTOCOL_LIST);
                     log.warn("Valid protocols are: {}", join(sock.getSupportedProtocols()));
+                }
+            }
+        }
+
+        if (!CIPHER_LIST.isEmpty()) {
+            try {
+                sock.setEnabledCipherSuites(ciphers);
+            } catch (IllegalArgumentException e) { // NOSONAR
+                if (log.isWarnEnabled()) {
+                    log.warn("Could not set cipher list: {}.", CIPHER_LIST);
+                    log.warn("Valid ciphers are: {}", join(sock.getSupportedCipherSuites()));
                 }
             }
         }
