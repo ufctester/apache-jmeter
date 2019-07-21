@@ -75,11 +75,11 @@ PostProcessor, Serializable {
     //- JMX file attributes
 
     private String concat(String s1,String s2){
-        return new StringBuilder(s1).append("_").append(s2).toString(); // $NON-NLS-1$
+        return s1 + "_" + s2; // $NON-NLS-1$
     }
 
     private String concat(String s1, int i){
-        return new StringBuilder(s1).append("_").append(i).toString(); // $NON-NLS-1$
+        return s1 + "_" + i; // $NON-NLS-1$
     }
 
 
@@ -116,7 +116,7 @@ PostProcessor, Serializable {
                 String inputString=vars.get(getVariableName());
                 if(inputString != null) {
                     if(inputString.length()>0) {
-                        getValuesForXPath(getXPathQuery(), matches, matchNumber,previousResult.getResponseDataAsString());
+                        getValuesForXPath(getXPathQuery(), matches, matchNumber, inputString);
                     }
                 } else {
                     if (log.isWarnEnabled()) {
@@ -152,7 +152,7 @@ PostProcessor, Serializable {
             }
         }catch (Exception e) {// Saxon exception
             if (log.isWarnEnabled()) {
-                log.warn("Exception while processing '{})', message:{}", getXPathQuery(), e.getMessage());
+                log.warn("Exception while processing '{}', message:{}", getXPathQuery(), e.getMessage());
             }
             addAssertionFailure(previousResult, e, false);
         }
