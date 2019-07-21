@@ -21,7 +21,7 @@
 <!ENTITY rarr     "&#x02192;" >
 ]>
 
-<document prev="build-ldap-test-plan.html" next="build-ws-test-plan.html" id="$Id: build-ldapext-test-plan.xml 1809004 2017-09-20 11:49:00Z pmouawad $">
+<document prev="build-ldap-test-plan.html" next="build-ws-test-plan.html" id="$Id: build-ldapext-test-plan.xml 1854570 2019-03-01 10:03:02Z pmouawad $">
 
 
 <properties>
@@ -184,6 +184,9 @@ When this field is kept empty, an anonymous bind will be established.
 </li>
 <li>
 <i>(Optional)</i> Check the box Use Secure LDAP Protocol if you access with LDAP over SSL (ldaps)
+</li>
+<li>
+<i>(Optional)</i> Check the box TrustAll if you want the client to trust all certificates
 </li>
 </ol>
 </p>
